@@ -155,7 +155,7 @@ def traverse(robots,shortest_paths):
     
     awake.append(robots[0])
     while len(not_awake) > 0:
-        logging.info('NEW OUTER ITERATION')
+        #logging.info('NEW OUTER ITERATION')
         new_awake = []
         has_not_claimed = Queue()
         for node in awake:
@@ -165,9 +165,9 @@ def traverse(robots,shortest_paths):
         while True:
             prev_claims = claims.copy()
             while not has_not_claimed.empty():
-                logging.info('NEW INNER ITERATION')
+                #logging.info('NEW INNER ITERATION')
                 claim_node = has_not_claimed.get()
-                logging.info('CLAIM NODE: '+str(claim_node))
+                #logging.info('CLAIM NODE: '+str(claim_node))
                 claims,has_not_claimed = getMinPath(claim_node,paths[claim_node.index][-1],robots,shortest_paths,claims,has_not_claimed,awake)
 
             if prev_claims == claims:
@@ -186,7 +186,7 @@ def traverse(robots,shortest_paths):
     return paths
 
 def getMinPath(node,location,robots,paths,claims,has_not_claimed,awake):
-    logging.info('Get Min Path, Robot: '+str(node)+' at Location: '+str(location))
+    #logging.info('Get Min Path, Robot: '+str(node)+' at Location: '+str(location))
     index = location.index
     minimum = sys.maxsize
     minipath = None
@@ -196,23 +196,23 @@ def getMinPath(node,location,robots,paths,claims,has_not_claimed,awake):
     
     for (path,this_cost) in sorted_paths:
         destination = path[-1]
-        logging.info('GET MIN PATH FOR LOOP')
-        logging.info('destination: '+str(destination)+' cost='+str(this_cost))
-        logging.info('CURRENT CLAIMS: '+str(claims))
+        #logging.info('GET MIN PATH FOR LOOP')
+        #logging.info('destination: '+str(destination)+' cost='+str(this_cost))
+        #logging.info('CURRENT CLAIMS: '+str(claims))
         if destination not in awake:
             if destination in claims.keys() and this_cost<claims[destination][1]:
                 old_claim = claims[destination]
                 new_claim = (node,this_cost)
-                logging.info('NODE '+str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY OWNED BY '+str(old_claim))
-                logging.info('NEW CLAIM: '+str(destination)+' by '+str(new_claim))
+                #logging.info('NODE '+str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY OWNED BY '+str(old_claim))
+                #logging.info('NEW CLAIM: '+str(destination)+' by '+str(new_claim))
                 has_not_claimed.put(old_claim[0]) #add current claimant to has not claimed
                 claims[destination] = new_claim
                 return claims,has_not_claimed
             elif destination not in claims.keys():
                 new_claim = (node,this_cost)
                 claims[destination]=new_claim
-                logging.info(str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY UNCLAIMED')
-                logging.info('NEW CLAIM: '+str(new_claim))
+                #logging.info(str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY UNCLAIMED')
+                #logging.info('NEW CLAIM: '+str(new_claim))
                 return claims,has_not_claimed
 #    has_not_claimed.put(node)
     return claims,has_not_claimed
