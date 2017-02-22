@@ -39,19 +39,24 @@ def main(argv):
     outputfile=open(argv[1],"w")
     count = 1
     problems = eval(argv[2])
+    outputfile.write('akhlut\n')
+    outputfile.write('5nbod7qe4d7d3vdvl6t9klkhh\n')
     for line in inputfile:
+        answerstring = ''
         logging.info('Problem: '+str(count))
         if count in problems:
-            # solution = instance(line)
-            # if solution is None:
-            #     count+=1
-            #     continue
-            # answerstring = str(count) +': '
-            # for node in solution[:-1]:
-            #     answerstring += '('+str(node.x)+','+str(node.y)+'),'
-            # answerstring += '('+str(solution[-1].x)+','+str(solution[-1].y)+')'
-            # outputfile.write(answerstring)
-            instance(line)
+            answerstring+=str(count)+':'
+            solution = instance(line)
+            logging.info(str(solution))
+            for robot_path in [path for path in solution if len(path) > 1][:-1]:
+                for node in robot_path[:-1]:
+                    answerstring+='('+str(node.x)+','+str(node.y)+'),'
+                answerstring+='('+str(robot_path[-1].x)+','+str(robot_path[-1].y)+');'
+            last_path = [path for path in solution if len(path) > 1][-1]
+            for node in last_path[:-1]:
+                answerstring+='('+str(node.x)+','+str(node.y)+'),'
+            answerstring+='('+str(last_path[-1].x)+','+str(last_path[-1].y)+')'
+            outputfile.write(answerstring+'\n')
         count+=1
     outputfile.close()
         
@@ -138,6 +143,8 @@ def instance(line):
     ax3 = plotFinalRobotPaths(final_robot_paths,ax3)
     plt.grid(b=True, which='both', color='0.65',linestyle='-')
     plt.show()
+    return final_robot_paths
+    
 
 def traverse(robots,shortest_paths):
     awake = []
