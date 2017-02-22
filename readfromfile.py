@@ -1,6 +1,6 @@
 import math
 from math import sqrt
-
+from queue import *
 import sys
 from shapely.geometry import Polygon, LinearRing, LineString
 import logging
@@ -10,6 +10,7 @@ from descartes import PolygonPatch
 import pprint
 import multiprocessing
 from decimal import *
+from functools import partial
 
 class Node:
     def __init__(self,index,x,y,desc):
@@ -55,11 +56,6 @@ def main(argv):
     outputfile.close()
         
 def instance(line):
-    fig = plt.figure(1, figsize=(10,10), dpi=90)
-    ax = fig.add_subplot(111)
-    ax1= fig.add_subplot(111)
-
-    
     robots = []
     obstacles = []
     line = line.split(":")[1]
@@ -106,64 +102,41 @@ def instance(line):
     logging.info('GENERATED EDGES')
 
     #SHORTEST PATHS BETWEEN ROBOTS:
-    shortest_paths = {}
+    shortest_paths = [[[] for robot in robots] for robot in robots]
     logging.info("GENERATING SHORTEST PATHS...")
+    pool = multiprocessing.Pool()
     path_count = 0
     for i in range(len(robots)):
-        for j in range(len(robots)):
-            if i <= j:
-                continue
-            n1 = nodes[i]
-            n2 = nodes[j]
-            shortest_path = a_star_algorithm(nodes,edges,n2,n1)
-            shortest_paths[(n1,n2)]=shortest_path
-            shortest_paths[(n2,n1)]=list(reversed(shortest_path))
-            path_count+=2
+        partial_sp_function = partial(a_star_algorithm,nodes[i],nodes,edges)
+        shortest_paths[i] = pool.map(partial_sp_function,nodes[:len(robots)])
+         # for j in range(len(robots)):
+         #     if i <= j:
+         #         continue
+         #     n1 = nodes[i]
+         #     n2 = nodes[j]
+         #     shortest_path = a_star_algorithm(n2,nodes,edges,n1)
+         #     shortest_paths[i][j]=shortest_path
+         #     shortest_paths[j][i]=list(reversed(shortest_path))
+         #     path_count+=2
+                                     
     logging.info('GENERATED ['+str(path_count)+'] PATHS')
-#    logging.info('PLOTTING')
     logging.info('TRAVERSING...')
     pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(traverse(nodes[:len(robots)],shortest_paths))
+    final_robot_paths = traverse(nodes[:len(robots)],shortest_paths)
     
     #PLOT:
-    for obstacle in obstacles:
-        poly_patch = PolygonPatch(obstacle['polygon'])
-        ax.add_patch(poly_patch)
+    logging.info('PLOTTING')
+    fig = plt.figure(1, figsize=(10,10), dpi=90)
 
-    xs = []
-    ys = []
-    for robot in robots:
-        xs +=[robot['x']]
-        ys +=[robot['y']]
-
-    ax1.scatter(xs,ys)
-    ax.set_title('Polygon')
-   
-    major_ticks = np.arange(min(xs)-5, max(xs)+5, 1) 
-    minor_ticks = np.arange(min(ys)-5, max(ys)+5, 1)
-    path= fig.add_subplot(111)
-    for i in range(len(robots)):
-        n1 = nodes[i]
-        for j in range(len(robots)):
-            if i <= j:
-                continue
-            n2 = nodes[j]
-            pathxs = []
-            pathys = []
-            shortest_path = shortest_paths[(n1,n2)]
-            for node in shortest_path:
-                pathxs.append(node.x)
-                pathys.append(node.y)
-            path.plot(pathxs,pathys)
-
-    ax.set_xticks(major_ticks)                                                       
-    ax.set_xticks(minor_ticks, minor=True)                                           
-    ax.set_yticks(major_ticks)                                                       
-    ax.set_yticks(minor_ticks, minor=True)   
-    
-    
+    ax = fig.add_subplot(111)
+    ax1= fig.add_subplot(111)
+    ax2 = fig.add_subplot(111)
+    ax3 = fig.add_subplot(111)
+    ax =  plotObstacles(obstacles,ax)
+    ax1 = plotRobots(robots,ax1)
+#    ax2 = plotShortestPaths(robots,nodes,shortest_paths,ax2)
+    ax3 = plotFinalRobotPaths(final_robot_paths,ax3)
     plt.grid(b=True, which='both', color='0.65',linestyle='-')
-    
     plt.show()
 
 def traverse(robots,shortest_paths):
@@ -177,64 +150,66 @@ def traverse(robots,shortest_paths):
     while len(not_awake) > 0:
         logging.info('NEW OUTER ITERATION')
         new_awake = []
-        has_not_claimed = awake[:]
+        has_not_claimed = Queue()
+        for node in awake:
+            has_not_claimed.put(node)        
         claims = {} #key is robot being claimed, value: (claiming robot, distance)
-#        for robot in awake:
- #           if len(not_awake) == 0:
-  #              break
-        i = 0
-        while i < len(has_not_claimed):
-    #        logging.info(str(has_not_claimed))
-            logging.info("i: "+str(i)+" len(has_not_claimed): "+str(len(has_not_claimed))+' has_not_claimed[i]: '+str(has_not_claimed[i]))
-            claims,has_not_claimed,i = getMinPath(has_not_claimed[i],paths[has_not_claimed[i].index][-1],robots,shortest_paths,claims,has_not_claimed,awake,i)
+        #while not has_not_claimed.empty() and len(claims.keys()) < len(not_awake):
+        while True:
+            prev_claims = claims.copy()
+            while not has_not_claimed.empty():
+                logging.info('NEW INNER ITERATION')
+                claim_node = has_not_claimed.get()
+                logging.info('CLAIM NODE: '+str(claim_node))
+                claims,has_not_claimed = getMinPath(claim_node,paths[claim_node.index][-1],robots,shortest_paths,claims,has_not_claimed,awake)
+
+            if prev_claims == claims:
+                break
 
         for dest in claims.keys():
             source = claims[dest][0]
-            path = shortest_paths[(source,dest)]
+            source_loc = paths[source.index][-1]
+            path = shortest_paths[source_loc.index][dest.index]
             new_awake.append(dest)
-            paths[source.index].extend(path)
+            paths[source.index].extend(path[1:])
             paths[dest.index]+=[dest]
             
         awake.extend(new_awake)
         not_awake = [node for node in not_awake if node not in awake]
     return paths
-    logging.info(str(paths))
 
-def getMinPath(node,location,robots,paths,claims,has_not_claimed,awake,i):
-    logging.info('Get Min Path, Robot: '+str(node)+'\nLocation: '+str(location))
+def getMinPath(node,location,robots,paths,claims,has_not_claimed,awake):
+    logging.info('Get Min Path, Robot: '+str(node)+' at Location: '+str(location))
     index = location.index
     minimum = sys.maxsize
     minipath = None
     destination = None
-    path_keys = [key for key in paths.keys() if key[0]==location]
-    paths = [paths[key] for key in path_keys]
+    paths = [path for path in paths[index]]
     sorted_paths = [(p,cost(p)) for p in sorted(paths,key=lambda x:cost(x))]
     
     for (path,this_cost) in sorted_paths:
         destination = path[-1]
+        logging.info('GET MIN PATH FOR LOOP')
+        logging.info('destination: '+str(destination)+' cost='+str(this_cost))
+        logging.info('CURRENT CLAIMS: '+str(claims))
         if destination not in awake:
             if destination in claims.keys() and this_cost<claims[destination][1]:
-                claim = claims[destination]
-                logging.info('NODE '+str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY OWNED BY '+str(claim))
+                old_claim = claims[destination]
                 new_claim = (node,this_cost)
-                has_not_claimed.append(claim[0]) #add current claimant to has not claimed
-                has_not_claimed.remove(node)
+                logging.info('NODE '+str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY OWNED BY '+str(old_claim))
+                logging.info('NEW CLAIM: '+str(destination)+' by '+str(new_claim))
+                has_not_claimed.put(old_claim[0]) #add current claimant to has not claimed
                 claims[destination] = new_claim
-                return claims,has_not_claimed,i
+                return claims,has_not_claimed
             elif destination not in claims.keys():
-                claim = (node,this_cost)
-                claims[destination]=claim
+                new_claim = (node,this_cost)
+                claims[destination]=new_claim
                 logging.info(str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY UNCLAIMED')
-                has_not_claimed.remove(node)
-                return claims,has_not_claimed,i
-
-    i+=1
-    return claims,has_not_claimed,i
+                logging.info('NEW CLAIM: '+str(new_claim))
+                return claims,has_not_claimed
+#    has_not_claimed.put(node)
+    return claims,has_not_claimed
                 
-    
-                
-            
-
 def cost(path):
     cost = 0.0
     i = 0
@@ -249,7 +224,7 @@ def cost(path):
 def distance(n1,n2):
     return sqrt((n2.x-n1.x)**2 + (n2.y-n1.y)**2)
     
-def a_star_algorithm(nodes,edges,start,goal):
+def a_star_algorithm(goal,nodes,edges,start):
     openSet = []
     gScore = {}
     fScore = {}
@@ -335,8 +310,52 @@ def LOS(n1,n2,obstacles):
             obstructed = True
             break
     return not obstructed
-                       
-    
+
+def plotObstacles(obstacles,ax):
+    for obstacle in obstacles:
+        poly_patch = PolygonPatch(obstacle['polygon'])
+        ax.add_patch(poly_patch)
+    return ax
+def plotRobots(robots,ax):
+    xs = []
+    ys = []
+    for robot in robots:
+        xs +=[robot['x']]
+        ys +=[robot['y']]
+    major_ticks = np.arange(min(xs)-5, max(xs)+5, 1) 
+    minor_ticks = np.arange(min(ys)-5, max(ys)+5, 1)
+    ax.set_xticks(major_ticks)                                                       
+    ax.set_xticks(minor_ticks, minor=True)                                           
+    ax.set_yticks(major_ticks)                                                       
+    ax.set_yticks(minor_ticks, minor=True)   
+
+    ax.scatter(xs,ys)
+    return ax
+def plotShortestPaths(robots,nodes,shortest_paths,path):
+    for i in range(len(robots)):
+        n1 = nodes[i]
+        for j in range(len(robots)):
+            if i <= j:
+                continue
+            n2 = nodes[j]
+            pathxs = []
+            pathys = []
+            shortest_path = shortest_paths[i][j]
+            for node in shortest_path:
+                pathxs.append(node.x)
+                pathys.append(node.y)
+            path.plot(pathxs,pathys)
+    return path
+
+def plotFinalRobotPaths(paths,ax3):
+    for path in paths:
+        xs =[]
+        ys =[]
+        for node in path:
+            xs+=[node.x]
+            ys+=[node.y]
+        ax3.plot(xs,ys)
+    return ax3
 #args = inputfile, outputfile
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
 main(sys.argv[1:])
