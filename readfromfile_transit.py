@@ -128,6 +128,7 @@ def instance(line):
     logging.info('TRAVERSING...')
     pp = pprint.PrettyPrinter(indent=4)
     final_robot_paths = traverse(nodes[:len(robots)],shortest_paths)
+    logging.info('FINISHED TRAVERSAL')
     
     #PLOT:
     # logging.info('PLOTTING')
@@ -190,7 +191,7 @@ def traverse(robots,shortest_paths):
             paths[source.index].extend(path[1:])
             paths[dest.index]+=[dest]
        
-        logging.info(str(transit))
+       # logging.info(str(transit))
         awake.extend(new_awake)
         not_awake = [node for node in not_awake if node not in awake]
     return paths
@@ -214,16 +215,16 @@ def getMinPath(node,location,robots,paths,claims,has_not_claimed,awake,transit):
             if destination in claims.keys() and this_cost<claims[destination][1]:
                 old_claim = claims[destination]
                 new_claim = (node,this_cost)
-                logging.info('NODE '+str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY OWNED BY '+str(old_claim))
-                logging.info('NEW CLAIM: '+str(destination)+' by '+str(new_claim))
+                #logging.info('NODE '+str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY OWNED BY '+str(old_claim))
+                #logging.info('NEW CLAIM: '+str(destination)+' by '+str(new_claim))
                 has_not_claimed.put(old_claim[0]) #add current claimant to has not claimed
                 claims[destination] = new_claim
                 return claims,has_not_claimed
             elif destination not in claims.keys():
                 new_claim = (node,this_cost)
                 claims[destination]=new_claim
-                logging.info(str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY UNCLAIMED')
-                logging.info('NEW CLAIM: '+str(new_claim))
+                #logging.info(str(node)+' HAS CLAIMED: '+str(destination)+' PREVIOUSLY UNCLAIMED')
+                #logging.info('NEW CLAIM: '+str(new_claim))
                 return claims,has_not_claimed
 #    has_not_claimed.put(node)
     return claims,has_not_claimed
