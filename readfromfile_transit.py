@@ -130,19 +130,19 @@ def instance(line):
     final_robot_paths = traverse(nodes[:len(robots)],shortest_paths)
     
     #PLOT:
-    logging.info('PLOTTING')
-    fig = plt.figure(1, figsize=(10,10), dpi=90)
+    # logging.info('PLOTTING')
+#     fig = plt.figure(1, figsize=(10,10), dpi=90)
 
-    ax = fig.add_subplot(111)
-    ax1= fig.add_subplot(111)
-    ax2 = fig.add_subplot(111)
-    ax3 = fig.add_subplot(111)
-    ax =  plotObstacles(obstacles,ax)
-    ax1 = plotRobots(robots,ax1)
-#    ax2 = plotShortestPaths(robots,nodes,shortest_paths,ax2)
-    ax3 = plotFinalRobotPaths(final_robot_paths,ax3)
-    plt.grid(b=True, which='both', color='0.65',linestyle='-')
-    plt.show()
+#     ax = fig.add_subplot(111)
+#     ax1= fig.add_subplot(111)
+#     ax2 = fig.add_subplot(111)
+#     ax3 = fig.add_subplot(111)
+#     ax =  plotObstacles(obstacles,ax)
+#     ax1 = plotRobots(robots,ax1)
+# #    ax2 = plotShortestPaths(robots,nodes,shortest_paths,ax2)
+#     ax3 = plotFinalRobotPaths(final_robot_paths,ax3)
+#     plt.grid(b=True, which='both', color='0.65',linestyle='-')
+#    # plt.show()
     return final_robot_paths
     
 
@@ -182,6 +182,7 @@ def traverse(robots,shortest_paths):
         for dest in claims.keys():
             source = claims[dest][0]
             transit[source.index]=claims[dest][1]
+            logging.info('transit[source.index]: '+str(claims[dest][1]))
             transit[dest.index] = transit[source.index]
             source_loc = paths[source.index][-1]
             path = shortest_paths[source_loc.index][dest.index]
@@ -204,7 +205,7 @@ def getMinPath(node,location,robots,paths,claims,has_not_claimed,awake,transit):
     sorted_paths = [(p,cost(p)) for p in sorted(paths,key=lambda x:cost(x))]
     distance_to_go = transit[node.index]
     for (path,this_cost) in sorted_paths:
-        this_cost+=distance_to_go
+        this_cost-=distance_to_go
         destination = path[-1]
         #logging.info('GET MIN PATH FOR LOOP')
         #logging.info('destination: '+str(destination)+' cost='+str(this_cost))
