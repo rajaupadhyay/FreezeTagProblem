@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+import cProfile
 import math
 from math import sqrt
 from queue import *
@@ -28,12 +30,16 @@ class Node:
         return not self.__eq__(other)
     def __hash__(self):
         return self.index
+    def ident(self):
+        return self.index
     
 class Tree:
     def __init__(self):
         self.robots = []
     
 def main(argv):
+    pr = cProfile.Profile()
+    pr.enable()
     logging.info("main")
     inputfile=open(argv[0],"r")
     outputfile=open(argv[1],"w")
@@ -59,6 +65,8 @@ def main(argv):
             outputfile.write(answerstring+'\n')
         count+=1
     outputfile.close()
+    pr.disable()
+    pr.print_stats(sort='time')
         
 def instance(line):
     robots = []
@@ -131,19 +139,19 @@ def instance(line):
     logging.info('FINISHED TRAVERSAL')
     
     #PLOT:
-    # logging.info('PLOTTING')
-#     fig = plt.figure(1, figsize=(10,10), dpi=90)
+    logging.info('PLOTTING')
+    fig = plt.figure(1, figsize=(10,10), dpi=90)
 
-#     ax = fig.add_subplot(111)
-#     ax1= fig.add_subplot(111)
-#     ax2 = fig.add_subplot(111)
-#     ax3 = fig.add_subplot(111)
-#     ax =  plotObstacles(obstacles,ax)
-#     ax1 = plotRobots(robots,ax1)
-# #    ax2 = plotShortestPaths(robots,nodes,shortest_paths,ax2)
-#     ax3 = plotFinalRobotPaths(final_robot_paths,ax3)
-#     plt.grid(b=True, which='both', color='0.65',linestyle='-')
-#    # plt.show()
+    ax = fig.add_subplot(111)
+    ax1= fig.add_subplot(111)
+    ax2 = fig.add_subplot(111)
+    ax3 = fig.add_subplot(111)
+    ax =  plotObstacles(obstacles,ax)
+    ax1 = plotRobots(robots,ax1)
+#    ax2 = plotShortestPaths(robots,nodes,shortest_paths,ax2)
+    ax3 = plotFinalRobotPaths(final_robot_paths,ax3)
+    plt.grid(b=True, which='both', color='0.65',linestyle='-')
+    plt.show()
     return final_robot_paths
     
 
@@ -156,7 +164,7 @@ def traverse(robots,shortest_paths):
     transit = [sys.maxsize for robot in robots]
     
     awake.append(robots[0])
-    
+    iterationcount = 0
     while len(not_awake) > 0:
         #logging.info('NEW OUTER ITERATION')
         new_awake = []
@@ -165,28 +173,54 @@ def traverse(robots,shortest_paths):
             has_not_claimed.put(node) 
         claims = {} #key is robot being claimed, value: (claiming robot, distance)
         #while not has_not_claimed.empty() and len(claims.keys()) < len(not_awake):
-        min_transit = min([t for t in transit])
+        logging.info('TRAVERSAL ITERATION <'+str(iterationcount)+'>')
+        logging.info('-----------------------')
+        logging.info('TRANSITS BEFORE ADDING')
+        for awake_robot in awake:
+            logging.info('\tROBOT: '+str(awake_robot))
+            logging.info('\tTRANSIT: '+str(transit[awake_robot.index]))
+        
+        max_transit = max([t for t in transit])
         for i in range(len(transit)):
             if transit[i]>0:
-                transit[i] -= min_transit
-        while True:
-            prev_claims = claims.copy()
-            while not has_not_claimed.empty():
-                #logging.info('NEW INNER ITERATION')
-                claim_node = has_not_claimed.get()
-                #logging.info('CLAIM NODE: '+str(claim_node))
-                claims,has_not_claimed = getMinPath(claim_node,paths[claim_node.index][-1],robots,shortest_paths,claims,has_not_claimed,awake,transit)
+                transit[i] = max_transit-transit[i]
 
-            if prev_claims == claims:
-                break
-
+        logging.info('AWAKE ROBOTS:')
+        for awake_robot in awake:
+            logging.info('\tROBOT: '+str(awake_robot))
+            logging.info('\t\tCURRENT LOCATION: '+str(paths[awake_robot.index][-1]))
+            logging.info('\t\tTRANSIT: '+str(transit[awake_robot.index]))
+                    
+        if len(not_awake) >= len(awake):
+            while True:
+                prev_claims = claims.copy()
+                while not has_not_claimed.empty():
+                    #logging.info('NEW INNER ITERATION')
+                    claim_node = has_not_claimed.get()
+                    #logging.info('CLAIM NODE: '+str(claim_node))
+                    claims,has_not_claimed = getMinPath(claim_node,paths[claim_node.index][-1],robots,shortest_paths,claims,has_not_claimed,awake,transit)
+                
+                if prev_claims == claims:
+                    break
+        else:
+            list_not_claimed = list(has_not_claimed.queue)
+            for node in not_awake:
+                sourceForDestination(node,list_not_claimed,awake,len(not_awake),shortest_paths,transit,claims,paths)
+                
+        logging.info('CLAIMS')    
+        for robot_claimed in claims.keys():
+            logging.info('\tCLAIMED: '+str(robot_claimed)+'\tCLAIMED BY: '+str(claims[robot_claimed]))
+            
+        logging.info('NEWLY AWAKENED ROBOTS')
         for dest in claims.keys():
             source = claims[dest][0]
             transit[source.index]=claims[dest][1]
-            logging.info('transit[source.index]: '+str(claims[dest][1]))
+            #logging.info('transit['+str(source.index)+']: '+str(claims[dest][1]))
             transit[dest.index] = transit[source.index]
             source_loc = paths[source.index][-1]
             path = shortest_paths[source_loc.index][dest.index]
+            logging.info('\tNEW ROBOT: '+str(dest))
+            logging.info('\tWOKEN BY: '+str(source))
             new_awake.append(dest)
             paths[source.index].extend(path[1:])
             paths[dest.index]+=[dest]
@@ -194,8 +228,53 @@ def traverse(robots,shortest_paths):
        # logging.info(str(transit))
         awake.extend(new_awake)
         not_awake = [node for node in not_awake if node not in awake]
+        iterationcount+=1
     return paths
 
+def sourceForDestination(non_awakened_node,has_not_claimed,awake_nodes,num_not_awake,paths,transit,claims,locations):
+    positions = {}
+    for awake_node in awake_nodes:
+        location_history = locations[awake_node.index]
+        last = location_history[-1]
+        last_index = last.ident()
+        positions[awake_node.index] = last_index
+    
+    costs_to_node = sorted([(node,cost(paths[positions[node.index]][non_awakened_node.index])+transit[node.index]) for node in awake_nodes],key=lambda x:-1*x[1])
+    
+    logging.info('COSTS TO NODE: '+str(costs_to_node))
+    num_to_remove = len(awake_nodes) - num_not_awake
+    logging.info('num_to_remove: '+str(num_to_remove))
+    
+    logging.info('REMOVING: '+str(costs_to_node[-1]))
+    costs_to_node = costs_to_node[:-num_to_remove]
+    logging.info('COSTS TO NODE AFTER REMOVAL: '+str(costs_to_node))
+    longest = costs_to_node[-1]
+    
+    while True:
+        if longest[0] in [claim[0] for claim in claims.values()]:
+            claims_list = [(destination,claims[destination]) for destination in claims.keys()]
+
+            existing_claim = [claim for claim in claims_list if claim[1][0] == longest[0]][0]
+            logging.info('longest[1]:'+str(longest[1])+' existing_claim[1][1]: '+str(existing_claim[1][1]))
+            if longest[1] > existing_claim[1][1]:
+                logging.info('INNER IF CALLED')
+                existing_dest = existing_claim[0]
+                claims[non_awakened_node] = longest
+                sourceForDestination(existing_dest,has_not_claimed,awake_nodes,num_not_awake,paths,transit,claims,locations)
+                break
+            else:
+                logging.info('INNER ELSE CALLED')
+                costs_to_node = costs_to_node[:-1]
+                longest = costs_to_node[-1]
+                continue
+        else:
+            logging.info('OUTER ELSE CALLED')
+            claims[non_awakened_node] = longest
+            has_not_claimed.remove(longest[0])
+            break
+        
+        
+    
 def getMinPath(node,location,robots,paths,claims,has_not_claimed,awake,transit):
     #logging.info('Get Min Path, Robot: '+str(node)+' at Location: '+str(location))
     index = location.index
@@ -205,8 +284,10 @@ def getMinPath(node,location,robots,paths,claims,has_not_claimed,awake,transit):
     paths = [path for path in paths[index]]
     sorted_paths = [(p,cost(p)) for p in sorted(paths,key=lambda x:cost(x))]
     distance_to_go = transit[node.index]
+    final_something = []
     for (path,this_cost) in sorted_paths:
-        this_cost-=distance_to_go
+        this_cost+=distance_to_go
+        final_something += [(node,this_cost)]
         destination = path[-1]
         #logging.info('GET MIN PATH FOR LOOP')
         #logging.info('destination: '+str(destination)+' cost='+str(this_cost))
