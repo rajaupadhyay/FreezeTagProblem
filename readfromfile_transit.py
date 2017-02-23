@@ -364,18 +364,20 @@ def plotShortestPaths(robots,nodes,shortest_paths,path):
             for node in shortest_path:
                 pathxs.append(node.x)
                 pathys.append(node.y)
-            path.plot(pathxs,pathys)
+            path.plot(pathxs, pathys)
     return path
 
 def plotFinalRobotPaths(paths,ax3):
     for path in paths:
-        xs =[]
-        ys =[]
+        xs = []
+        ys = []
         for node in path:
-            xs+=[node.x]
-            ys+=[node.y]
-        ax3.plot(xs,ys)
+            xs += [node.x]
+            ys += [node.y]
+        ax3.plot(xs, ys)
     return ax3
-#args = inputfile, outputfile
+
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
-main(sys.argv[1:])
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
